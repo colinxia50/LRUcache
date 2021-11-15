@@ -1,0 +1,25 @@
+syntax="proto3";
+
+option go_package="/pb;";
+
+import "cache_message.proto";
+
+message RegCacheRequest{
+    string baseURL=1;
+}
+
+message RegCacheResponse{
+    int32 status=1;
+}
+
+message NodesAdders{
+    repeated string NodesAdders=1;
+}
+
+service CacheService{
+    rpc findAllCacheNode(RegCacheRequest) returns (NodesAdders){};
+    rpc regCacheNode(RegCacheRequest) returns (RegCacheResponse){};
+    rpc getCache(Key)returns(Cache){};
+    rpc setCache(Cache)returns(Key){};
+    rpc remove(Key)returns(Key){};
+}

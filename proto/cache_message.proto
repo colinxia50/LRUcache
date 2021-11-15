@@ -1,0 +1,12 @@
+syntax="proto3";
+
+option go_package="/pb;";
+
+message Key{
+    string key=1;
+}
+
+message Cache{
+    string key=1;
+    bytes value=2;
+}
