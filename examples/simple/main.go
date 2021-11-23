@@ -4,23 +4,22 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/colinxia/lrucache/node"
+	"github.com/colinxia50/LRUcache/node"
 )
 
-type Value int
+// type Value int
 
-func (v Value) String() string {
-	return fmt.Sprintf("xia%d", v)
-}
+// func (v Value) String() string {
+// 	return fmt.Sprintf("xia%d", v)
+// }
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	cacheServer := node.RunNode("127.0.0.1:9090", ctx)
+
+	cacheServer, ctx := node.RunNode("127.0.0.1:9090", context.Background())
 	//注册节点信息 地址空表示单体应用
 	//当作新加节点就传入任意在线远程节点地址就可
-	cacheServer.Reg()
+	cacheServer.Reg("")
 
-	key, err := cacheServer.Set("keyhhhhh", Value(1234))
+	key, err := cacheServer.Set("key", []byte("1234"))
 	if err != nil {
 		fmt.Println(err)
 	}

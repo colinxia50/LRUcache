@@ -3,15 +3,15 @@ package test
 import (
 	"testing"
 
-	"github.com/colinxia/lrucache/node"
+	"github.com/colinxia50/LRUcache/node"
 )
 
 func TestHashNode(t *testing.T) {
-	consistent := node.NewMap(5, nil)
+	consistent := node.NewMap(50, nil)
 	nodes := []string{"127.0.0.1:9001", "127.0.0.1:9002", "127.0.0.1:9003"}
 	consistent.Add(nodes...)
 	k, n := consistent.GetNode()
-	if k != len(nodes)*5 {
+	if k != len(nodes)*50 {
 		t.Error("创建节点失败")
 	}
 	t.Log(n)

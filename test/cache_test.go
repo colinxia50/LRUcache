@@ -1,11 +1,12 @@
 package test
 
 import (
+	"context"
 	"testing"
 
-	"github.com/colinxia/lrucache/cache"
-	"github.com/colinxia/lrucache/node"
-	"github.com/colinxia/lrucache/pb"
+	"github.com/colinxia50/LRUcache/cache"
+	"github.com/colinxia50/LRUcache/node"
+	"github.com/colinxia50/LRUcache/pb"
 )
 
 func TestCacheGet(t *testing.T) {
@@ -24,18 +25,12 @@ func TestCacheGet(t *testing.T) {
 	}
 }
 
-type Value int
-
-func (v Value) String() string {
-	return v.String()
-}
-
 func TestNodePool(t *testing.T) {
-	cacheServer := node.RunNode("127.0.0.1:9090", nil)
+	cacheServer, _ := node.RunNode("127.0.0.1:9090", context.Background())
 	//注册节点信息 地址空表示单体应用
-	cacheServer.Reg()
+	cacheServer.Reg("")
 
-	key, err := cacheServer.Set("key1", Value(1234))
+	key, err := cacheServer.Set("key1", []byte("1234"))
 	if err != nil {
 		t.Error(err)
 	}

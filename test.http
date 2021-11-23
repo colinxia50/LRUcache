@@ -1,0 +1,8 @@
+POST 127.0.0.1:9000 HTTP/1.1
+content-type: application/json
+
+{
+    "key":"user",
+    "name": "sample",
+    "dec": "json结构没要求有key元素就行"
+}
