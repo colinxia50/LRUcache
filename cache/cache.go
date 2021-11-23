@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"sync"
 
-	"github.com/colinxia/lrucache/pb"
+	"github.com/colinxia50/LRUcache/pb"
 )
 
 type Cache struct {

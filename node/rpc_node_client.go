@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/colinxia/lrucache/pb"
+	"github.com/colinxia50/LRUcache/pb"
 	"google.golang.org/grpc"
 )
 
@@ -55,11 +55,11 @@ func (r *rpcClient) GetCacheValue(key string) (*pb.Cache, error) {
 		Key: key,
 	}
 	//超时测试
-	cxt, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	cxt, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	res, err := r.client.GetCache(cxt, req)
 	if err != nil {
-		log.Fatal("获取远程缓存数据错误", err)
+		log.Println("获取远程缓存数据失败--", err)
 	}
 	return res, err
 }

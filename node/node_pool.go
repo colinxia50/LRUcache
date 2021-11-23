@@ -1,14 +1,17 @@
 package node
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"log"
 	"net"
+	"net/http"
 	"sync"
 	"time"
 
-	"github.com/colinxia/lrucache/cache"
-	"github.com/colinxia/lrucache/pb"
+	"github.com/colinxia50/LRUcache/cache"
+	"github.com/colinxia50/LRUcache/pb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/health"
@@ -16,8 +19,7 @@ import (
 )
 
 const (
-	defaultBasePath = "/cache/"
-	defaultReplicas = 50
+	defaultReplicas = 3
 )
 
 /*
@@ -28,12 +30,10 @@ const (
 */
 
 // self 当前节点地址
-// basePath
 // node_hash 一致性哈希 计算哈希值
 // nodes 节点池
 type NODEPool struct {
 	self      string
-	basePath  string
 	mu        sync.Mutex
 	node_hash *Map
 	cache     *cache.Cache
@@ -42,40 +42,42 @@ type NODEPool struct {
 
 // 启动节点
 //lca 本地节点地址
-func RunNode(lca string, ctx context.Context) *NODEPool {
+func RunNode(lca string, ctx context.Context) (*NODEPool, context.Context) {
 	nodePool := NODEPool{
-		self:     lca,
-		basePath: defaultBasePath,
-		cache:    cache.NewCacheStore(2<<10, nil),
-		nodes:    make(map[string]*RegBaseUrl),
+		self:  lca,
+		cache: cache.NewCacheStore(2<<10, nil),
+		nodes: make(map[string]*RegBaseUrl),
 	}
 	rpcServer := NewRpcCacheServer(&nodePool)
 	grpcServer := grpc.NewServer()
 	pb.RegisterCacheServiceServer(grpcServer, rpcServer)
+
 	healthserver := health.NewServer()
 	healthserver.SetServingStatus("grpc.health", healthpb.HealthCheckResponse_SERVING)
 	healthpb.RegisterHealthServer(grpcServer, healthserver)
+
 	listener, err := net.Listen("tcp", lca)
 	if err != nil {
 		log.Fatal("监听节点服务失败", err)
 	}
+	ctx, cancel := context.WithCancel(ctx)
 	go func() {
 		log.Println("服务启动")
 		log.Println(grpcServer.Serve(listener))
-		ctx.Done()
+		cancel()
 	}()
-	return &nodePool
+	return &nodePool, ctx
 }
 
 // 向远程节点注册当前节点信息 返回全部节点信息
 // 将返回得到的全部节点信息注册到当前节点 保证节点信息同步
 // fromNode 远程节点地址
-func (n *NODEPool) Reg(fromNode ...string) {
+func (n *NODEPool) Reg(fromNode string) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	n.node_hash = NewMap(defaultReplicas, nil)
 	if len(fromNode) > 0 {
-		RpcClient := NewClien(fromNode[0])
+		RpcClient := NewClien(fromNode)
 		nodeAddress, err := RpcClient.findAllCacheNode()
 		if err != nil {
 			log.Fatal("注册节点-查询节点信息失败 ", err)
@@ -128,19 +130,14 @@ func (n *NODEPool) Health(s time.Duration) *time.Timer {
  缓存设置->根据key选择对应节点->rpc请求到节点设置
 */
 
-//定义类型key->value类型
-type Value interface {
-	String() string
-}
+type GetFunc func(key string) []byte
 
-type GetFunc func(key string) Value
-
-func (n *NODEPool) Set(key string, value Value) (*pb.Key, error) {
+func (n *NODEPool) Set(key string, value []byte) (*pb.Key, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	data := &pb.Cache{
 		Key:   key,
-		Value: []byte(value.String()),
+		Value: value,
 	}
 	if node := n.node_hash.Get(key); node != "" {
 		return n.nodes[node].SetRpcValue(key, data)
@@ -151,8 +148,8 @@ func (n *NODEPool) Set(key string, value Value) (*pb.Key, error) {
 }
 
 func (n *NODEPool) Get(key string, f GetFunc) (*pb.Cache, error) {
-	//n.mu.Lock()
-	//defer n.mu.Unlock()
+	n.mu.Lock()
+	defer n.mu.Unlock()
 	if node := n.node_hash.Get(key); node != "" {
 		if node == n.self {
 			value, err := n.cache.Get(key)
@@ -166,7 +163,7 @@ func (n *NODEPool) Get(key string, f GetFunc) (*pb.Cache, error) {
 					value := f(key)
 					data := &pb.Cache{
 						Key:   key,
-						Value: []byte(value.String()),
+						Value: value,
 					}
 					n.nodes[node].SetRpcValue(key, data)
 					return data, nil
@@ -177,4 +174,58 @@ func (n *NODEPool) Get(key string, f GetFunc) (*pb.Cache, error) {
 		return value, err
 	}
 	return nil, errors.New("无此key数据")
+}
+
+//实现handler接口
+//http服务 处理restfulAPI风格请求
+func (n *NODEPool) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	switch r.Method {
+	case http.MethodGet:
+		key := r.URL.Query().Get("key")
+		if len(key) == 0 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		data, err := n.Get(key, nil)
+		if err != nil {
+			w.Write([]byte("无效key"))
+			return
+		}
+		w.Header().Set("content-type", "text/json")
+		w.Write(data.GetValue())
+		return
+	case http.MethodPost:
+		decoder := json.NewDecoder(r.Body)
+		var params map[string]interface{}
+		decoder.Decode(&params)
+		key, ok := params["key"]
+		if !ok {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		buffs := new(bytes.Buffer)
+		enc := json.NewEncoder(buffs)
+		enc.Encode(params)
+		n.Set(key.(string), buffs.Bytes())
+		w.Write(buffs.Bytes())
+		return
+	default:
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+}
+
+//测试用 查看所有在线的节点
+func (n *NODEPool) GetNodes() {
+	for k, v := range n.nodes {
+		log.Println(k, v.BaseURL)
+	}
+}
+
+//测试用 查找key所分配的节点 当前所有节点信息
+func (n *NODEPool) GetKeyNode(key string) {
+
+	log.Println("分布在:", n.node_hash.Get(key))
+	log.Println(n.node_hash.GetNode())
+
 }

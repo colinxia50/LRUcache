@@ -53,9 +53,39 @@
                                |
                         调用回调函数获取值并缓存-返回缓存值
    ```
-## 三 如何使用
+## 三 如何运行
 
 写本项目初衷 **`仅学习交流`** 练手用，感兴趣朋友可任意修改、完善。编码有些随意，内有详细中文注释。
-集成到项目中或单独运行都可，写有两种示例，直接运行即可，见[examples](./examples)
+集成到项目中或单独运行都可，见[examples](./examples)
 
+* [交互式](./examples/simple_cmd)
+   ```
+   //多开命令行 运行不同节点
+   $  go run examples/simple_cmd/main.go
+   ```
+   !["如图"](simple_cmd.png?raw=true)
+
+* [HTTP服务](./examples/simple_http)
+   ```
+   //多开命令行运行 以下命令开启了4个http服务
+
+   //不带regport参数为单体应用
+    $ go run examples/simple_cmd/main.go -ip=127.0.0.1 -port=9000
+
+   // regport参数 只要是在线的节点就行
+    $ go run examples/simple_cmd/main.go -ip=127.0.0.1 -port=9001 -regport=9000
+    $ go run examples/simple_cmd/main.go -ip=127.0.0.1 -port=9002 -regport=9001
+    $ go run examples/simple_cmd/main.go -ip=127.0.0.1 -port=9003 -regport=9000
+
+   ```
+   ```
+   //curl请求测试
+   //设置key
+   $ curl -H "Content-Type: application/json" -X POST -d '{"key": "user", "userid":100,"description":"json结构没要求有key就行" }' "127.0.0.1:9001"
+
+      //查找key
+   $ curl -i "127.0.0.1:9000?key=user"
+   $ curl -i "127.0.0.1:9003?key=user"
+   ```
+   !["如图"](simple_http.png?raw=true)
 

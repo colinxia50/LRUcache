@@ -6,6 +6,8 @@ import (
 	"hash/crc32"
 	"math/rand"
 	"sort"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -18,6 +20,7 @@ type Hash func(data []byte) uint32
 type Map struct {
 	hash     Hash
 	replicas int
+	rw       sync.RWMutex
 	keys     []int // Sorted
 	hashMap  map[int]string
 }
@@ -51,10 +54,14 @@ Map[随机字符串+ip2]=ip2
 
 */
 func (m *Map) Add(keys ...string) {
+	m.rw.Lock()
+	defer m.rw.Unlock()
 	for _, key := range keys {
 		for i := 0; i < m.replicas; i++ {
 			//拼接随机字符串再哈希 使虚拟节点分布均匀
-			hash := int(m.hash([]byte(RandString(10) + key)))
+			//...真的蠢 这里不能用随机 又不是轮轴式架构
+			//hash := int(m.hash([]byte(RandString(10) + key)))
+			hash := int(m.hash([]byte(strconv.Itoa(i+10) + "colinxia50" + key)))
 			m.keys = append(m.keys, hash)
 			m.hashMap[hash] = key
 		}
